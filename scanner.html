@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRX Security Scanner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:#06080f;--bg2:#090d1a;--bg3:#0d1220;--card:#111827;--card2:#141e2e;
+  --border:#1e2d47;--border2:#243558;
+  --accent:#3b82f6;--accent2:#8b5cf6;--accent3:#06b6d4;
+  --red:#ef4444;--orange:#f97316;--yellow:#eab308;--green:#10b981;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --critical:#ef4444;--high:#f97316;--medium:#eab308;--low:#10b981;
+  --glow-blue:rgba(59,130,246,0.15);--glow-purple:rgba(139,92,246,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ANIMATED BACKGROUND */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 10%,rgba(59,130,246,0.06),transparent),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(139,92,246,0.05),transparent);pointer-events:none;z-index:0}
+
+/* GRID OVERLAY */
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(59,130,246,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+/* HEADER */
+header{position:sticky;top:0;z-index:200;background:rgba(6,8,15,0.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:16px}
+.logo-mark{width:32px;height:32px;position:relative;flex-shrink:0}
+.logo-mark svg{width:32px;height:32px}
+.logo-ring{animation:spin-slow 8s linear infinite}
+@keyframes spin-slow{to{transform:rotate(360deg);transform-origin:16px 16px}}
+.header-title{font-size:15px;font-weight:800;letter-spacing:.02em;background:linear-gradient(90deg,#60a5fa,#a78bfa,#67e8f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header-sub{font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase}
+.header-badge{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3)}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(16,185,129,0.5);animation:pulse-ring 2s infinite}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(16,185,129,0.5)}70%{box-shadow:0 0 0 6px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 58px);position:relative;z-index:1}
+
+/* SIDEBAR */
+.sidebar{background:rgba(9,13,26,0.8);backdrop-filter:blur(10px);border-right:1px solid var(--border);padding:16px 0;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sidebar-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:0 20px;margin:14px 0 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;font-size:12.5px;font-weight:500;color:var(--text3);transition:all .2s;margin:1px 8px;border-radius:8px;border:1px solid transparent;position:relative;overflow:hidden}
+.nav-item::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--glow-blue),transparent);opacity:0;transition:opacity .2s;border-radius:8px}
+.nav-item:hover{color:var(--text);background:rgba(30,45,71,0.5)}
+.nav-item:hover::before{opacity:1}
+.nav-item.active{color:#93c5fd;background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.2)}
+.nav-item.active::before{opacity:1}
+.nav-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(30,45,71,0.6);flex-shrink:0;transition:all .2s}
+.nav-item.active .nav-icon{background:rgba(59,130,246,0.15)}
+.nav-icon svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nav-count{margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(30,45,71,0.8);color:var(--text3);transition:all .2s}
+.nav-item.active .nav-count{background:rgba(59,130,246,0.2);color:#93c5fd}
+.sidebar-divider{height:1px;background:var(--border);margin:10px 16px}
+
+/* RISK BARS */
+.risk-bars{padding:0 16px;margin-top:4px}
+.risk-row{margin-bottom:10px}
+.risk-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.risk-name{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.risk-val{font-size:10px;font-weight:700}
+.risk-track{height:4px;background:rgba(30,45,71,0.8);border-radius:2px;overflow:hidden}
+.risk-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* MAIN */
+.main{padding:24px 28px;overflow-y:auto;min-height:0}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-track{background:transparent}
+.main::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* DROP ZONE */
+.dropzone{border:1px solid var(--border2);border-radius:16px;padding:64px 40px;text-align:center;cursor:pointer;transition:all .3s;background:linear-gradient(135deg,rgba(17,24,39,0.8),rgba(20,30,46,0.6));position:relative;overflow:hidden}
+.dropzone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--glow-blue),var(--glow-purple));opacity:0;transition:opacity .3s}
+.dropzone:hover,.dropzone.drag{border-color:rgba(59,130,246,0.5);transform:translateY(-2px);box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 40px rgba(59,130,246,0.1)}
+.dropzone:hover::before,.dropzone.drag::before{opacity:1}
+.dz-icon-wrap{width:72px;height:72px;margin:0 auto 20px;position:relative}
+.dz-icon-wrap svg{width:72px;height:72px;stroke:url(#grad1);fill:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+.dz-ring{animation:dz-pulse 3s ease-in-out infinite}
+@keyframes dz-pulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+.dropzone h2{font-size:22px;font-weight:800;margin-bottom:10px;background:linear-gradient(90deg,var(--text),#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.dropzone p{color:var(--text3);font-size:13px;line-height:1.8;position:relative;z-index:1}
+
+/* CARDS */
+.card{background:rgba(17,24,39,0.7);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;transition:border-color .2s;animation:fadeUp .3s ease both}
+.card:hover{border-color:var(--border2)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
+.card-title-line{width:16px;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px}
+
+/* SCORE CARD */
+.score-card{background:linear-gradient(135deg,rgba(17,24,39,0.9),rgba(20,30,46,0.7));border:1px solid var(--border2);border-radius:16px;padding:24px;margin-bottom:14px;display:flex;align-items:center;gap:28px;position:relative;overflow:hidden;animation:fadeUp .4s ease both}
+.score-card::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,0.08),transparent);pointer-events:none}
+.ring-wrap{position:relative;width:120px;height:120px;flex-shrink:0}
+.ring-wrap svg{width:120px;height:120px;transform:rotate(-90deg)}
+.ring-track{stroke:rgba(30,45,71,0.8)}
+.ring-fill{transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)}
+.ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-number{font-size:30px;font-weight:900;line-height:1}
+.ring-sub{font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
+.score-info h2{font-size:24px;font-weight:900;margin-bottom:8px;letter-spacing:-.02em}
+.score-info p{font-size:12.5px;color:var(--text2);line-height:1.7;max-width:480px}
+.score-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+/* STAT BOXES */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.stat-box{background:rgba(17,24,39,0.7);border:1px solid var(--border);border-radius:10px;padding:14px 16px;transition:all .2s;cursor:default;animation:fadeUp .3s ease both}
+.stat-box:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.stat-val{font-size:28px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.stat-lbl{font-size:10px;color:var(--text3);margin-top:5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.stat-bar{height:2px;border-radius:1px;margin-top:10px;background:var(--border)}
+.stat-bar-fill{height:2px;border-radius:1px;transition:width 1s ease}
+
+/* FINDINGS */
+.finding{display:flex;gap:12px;padding:12px 14px;border-radius:10px;margin-bottom:6px;background:rgba(17,24,39,0.6);border:1px solid var(--border);cursor:pointer;transition:all .2s;animation:fadeUp .25s ease both;border-left-width:3px}
+.finding:hover{background:rgba(20,30,46,0.8);transform:translateX(2px);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+.finding.critical{border-left-color:var(--critical)}
+.finding.high{border-left-color:var(--high)}
+.finding.medium{border-left-color:var(--medium)}
+.finding.low{border-left-color:var(--low)}
+.finding.info{border-left-color:var(--accent)}
+.finding-body{flex:1;min-width:0}
+.finding-title{font-size:13px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.finding-file{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:4px;word-break:break-all}
+.finding-desc{font-size:12px;color:var(--text2);line-height:1.6}
+.finding-code{background:rgba(6,8,15,0.8);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;margin-top:8px;color:#a5f3fc;word-break:break-all;white-space:pre-wrap;max-height:0;overflow:hidden;transition:max-height .3s ease}
+.finding.open .finding-code{max-height:100px}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.badge-critical{background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.25)}
+.badge-high{background:rgba(249,115,22,0.12);color:#fdba74;border:1px solid rgba(249,115,22,0.25)}
+.badge-medium{background:rgba(234,179,8,0.12);color:#fde047;border:1px solid rgba(234,179,8,0.25)}
+.badge-low{background:rgba(16,185,129,0.12);color:#6ee7b7;border:1px solid rgba(16,185,129,0.25)}
+.badge-info{background:rgba(59,130,246,0.12);color:#93c5fd;border:1px solid rgba(59,130,246,0.25)}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:12.5px;font-weight:700;transition:all .2s;font-family:'Inter',sans-serif;letter-spacing:.01em;position:relative;overflow:hidden}
+.btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background .2s}
+.btn:hover::after{background:rgba(255,255,255,0.06)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px rgba(59,130,246,0.3)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,0.4)}
+.btn-ghost{background:rgba(30,45,71,0.6);border:1px solid var(--border2);color:var(--text2)}
+.btn-ghost:hover{border-color:rgba(59,130,246,0.4);color:var(--text)}
+.btn-sm{padding:6px 13px;font-size:11.5px}
+
+/* FILE TREE */
+.file-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:7px;margin-bottom:4px;background:rgba(17,24,39,0.5);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;transition:all .15s;word-break:break-all}
+.file-item:hover{background:rgba(20,30,46,0.8);border-color:var(--border2)}
+.file-ext{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;flex-shrink:0}
+.ext-js{background:rgba(234,179,8,0.15);color:#fde047}
+.ext-html{background:rgba(249,115,22,0.15);color:#fdba74}
+.ext-json{background:rgba(59,130,246,0.15);color:#93c5fd}
+.ext-css{background:rgba(139,92,246,0.15);color:#c4b5fd}
+.ext-img{background:rgba(16,185,129,0.15);color:#6ee7b7}
+.ext-other{background:rgba(100,116,139,0.15);color:#94a3b8}
+.file-size{margin-left:auto;color:var(--text3);font-size:10px;flex-shrink:0}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.filter-btn{padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
+.filter-btn:hover{border-color:var(--border2);color:var(--text)}
+.filter-btn.active{border-color:rgba(59,130,246,0.5);color:#93c5fd;background:rgba(59,130,246,0.08)}
+
+/* SECTION TITLE */
+.section-title{font-size:18px;font-weight:800;margin-bottom:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.section-title-accent{width:4px;height:20px;border-radius:2px;background:linear-gradient(180deg,var(--accent),var(--accent2))}
+.section-subtitle{font-size:12px;color:var(--text3);font-weight:400;margin-left:4px}
+
+/* URL CHIPS */
+.url-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;font-size:10.5px;font-family:'JetBrains Mono',monospace;background:rgba(17,24,39,0.8);border:1px solid var(--border);margin:3px;word-break:break-all;transition:border-color .15s}
+.url-chip:hover{border-color:var(--border2)}
+.url-chip.danger{border-color:rgba(239,68,68,0.3);color:#fca5a5;background:rgba(239,68,68,0.05)}
+.url-chip.warn{border-color:rgba(249,115,22,0.3);color:#fdba74;background:rgba(249,115,22,0.05)}
+
+/* LOADER */
+.loader-wrap{text-align:center;padding:80px 20px}
+.spinner-ring{width:52px;height:52px;margin:0 auto 20px;position:relative}
+.spinner-ring svg{width:52px;height:52px;transform:rotate(-90deg)}
+.spinner-track{stroke:rgba(30,45,71,0.6)}
+.spinner-arc{stroke:url(#spinGrad);stroke-dasharray:120;stroke-dashoffset:30;animation:spin .9s linear infinite;transform-origin:26px 26px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.loader-step{font-size:12px;color:var(--text3);margin-bottom:20px;min-height:18px;transition:opacity .2s}
+.progress-track{height:3px;background:rgba(30,45,71,0.8);border-radius:2px;overflow:hidden;width:320px;margin:0 auto}
+.progress-fill{height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease}
+
+/* META GRID */
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.meta-item{background:rgba(9,13,26,0.6);border:1px solid var(--border);border-radius:8px;padding:12px}
+.meta-key{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;font-weight:700}
+.meta-val{font-size:13px;font-weight:600;word-break:break-word}
+
+/* MISC */
+.hidden{display:none!important}
+.empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px}
+.empty-icon{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.empty-icon svg{width:18px;height:18px;stroke:var(--text3);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.divider{height:1px;background:var(--border);margin:14px 0}
+input[type=file]{display:none}
+.stagger-1{animation-delay:.05s}
+.stagger-2{animation-delay:.1s}
+.stagger-3{animation-delay:.15s}
+.stagger-4{animation-delay:.2s}
+.stagger-5{animation-delay:.25s}
+.upload-alt{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:rgba(30,45,71,0.5);border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text2);transition:all .2s;font-family:'Inter',sans-serif}
+.upload-alt:hover{border-color:rgba(59,130,246,0.4);color:var(--text)}
+.upload-alt svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:14px}
+.feature-item{background:rgba(9,13,26,0.5);border:1px solid var(--border);border-radius:9px;padding:13px;transition:border-color .2s}
+.feature-item:hover{border-color:var(--border2)}
+.feature-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.feature-dot{width:5px;height:5px;border-radius:50%}
+.feature-desc{font-size:11px;color:var(--text3);line-height:1.6}
+.report-pre{background:rgba(6,8,15,0.8);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:11px;overflow:auto;color:#a5f3fc;max-height:480px;line-height:1.6}
+.report-pre::-webkit-scrollbar{width:3px;height:3px}
+.report-pre::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 32 32" fill="none">
+      <circle class="logo-ring" cx="16" cy="16" r="13" stroke="url(#grad1)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <path d="M16 8 L20 12 L20 18 L16 22 L12 18 L12 12 Z" stroke="url(#grad1)" stroke-width="1.5" fill="rgba(59,130,246,0.1)"/>
+      <circle cx="16" cy="16" r="2.5" fill="url(#grad1)"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">CRX Security Scanner</div>
+    <div class="header-sub">Static Analysis Engine</div>
+  </div>
+  <div class="header-badge">
+    <div class="pulse-dot"></div>
+    <span>Local Analysis &mdash; No Upload</span>
+  </div>
+</header>
+
+<div class="app">
+  <nav class="sidebar" id="sidebar">
+    <div style="padding:0 8px">
+      <div class="sidebar-label">Analysis</div>
+      <div class="nav-item active" onclick="showSection('overview')" id="nav-overview">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></div>
+        Overview
+      </div>
+      <div class="nav-item" onclick="showSection('findings')" id="nav-findings">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M8 1L2 14h12L8 1z"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r=".75" fill="currentColor" stroke="none"/></svg></div>
+        Findings
+        <span class="nav-count" id="cnt-findings">0</span>
+      </div>
+      <div class="nav-item" onclick="showSection('manifest')" id="nav-manifest">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><rect x="2" y="1" width="12" height="14" rx="1.5"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg></div>
+        Manifest
+      </div>
+      <div class="nav-item" onclick="showSection('js')" id="nav-js">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M4 3L2 8l2 5M12 3l2 5-2 5M9 2l-2 12"/></svg></div>
+        JavaScript
+        <span class="nav-count" id="cnt-js">0</span>
+      </div>
+      <div class="nav-item" onclick="showSection('html')" id="nav-html">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M2 3l1 10 5 1.5 5-1.5 1-10z"/><path d="M5 6h6M5.5 9h5M6 12h4"/></svg></div>
+        HTML
+        <span class="nav-count" id="cnt-html">0</span>
+      </div>
+      <div class="nav-item" onclick="showSection('network')" id="nav-network">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 2c-2 2-3 4-3 6s1 4 3 6"/><path d="M8 2c2 2 3 4 3 6s-1 4-3 6"/><line x1="2" y1="8" x2="14" y2="8"/></svg></div>
+        Network
+        <span class="nav-count" id="cnt-network">0</span>
+      </div>
+      <div class="nav-item" onclick="showSection('privacy')" id="nav-privacy">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M8 1.5L2 4v4c0 3 2.5 5.5 6 6.5 3.5-1 6-3.5 6-6.5V4z"/></svg></div>
+        Privacy
+        <span class="nav-count" id="cnt-privacy">0</span>
+      </div>
+      <div class="nav-item" onclick="showSection('secrets')" id="nav-secrets">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 016 0v2"/><circle cx="8" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg></div>
+        Secrets
+        <span class="nav-count" id="cnt-secrets">0</span>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="nav-item" onclick="showSection('files')" id="nav-files">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M2 3a1 1 0 011-1h4l2 2h5a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg></div>
+        File Tree
+      </div>
+      <div class="nav-item" onclick="showSection('report')" id="nav-report">
+        <div class="nav-icon"><svg viewBox="0 0 16 16"><path d="M9 1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V6z"/><path d="M9 1v5h5"/><line x1="5" y1="9" x2="11" y2="9"/><line x1="5" y1="11.5" x2="8.5" y2="11.5"/></svg></div>
+        Export Report
+      </div>
+    </div>
+    <div id="risk-summary-sidebar" style="display:none;margin-top:14px">
+      <div class="sidebar-label" style="padding:0 20px">Risk Breakdown</div>
+      <div class="risk-bars" id="sidebar-risk"></div>
+    </div>
+  </nav>
+
+  <div class="main" id="main">
+
+    <!-- UPLOAD -->
+    <div id="sec-upload">
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('crxFile').click()" ondragover="handleDrag(event,true)" ondragleave="handleDrag(event,false)" ondrop="handleDrop(event)">
+        <div class="dz-icon-wrap">
+          <svg class="dz-ring" viewBox="0 0 72 72" fill="none">
+            <circle cx="36" cy="36" r="32" stroke="url(#grad1)" stroke-width="1" stroke-dasharray="6 4" opacity=".5"/>
+            <circle cx="36" cy="36" r="22" stroke="url(#grad1)" stroke-width="1" stroke-dasharray="4 6" opacity=".3"/>
+            <path d="M36 24v16M28 32l8-8 8 8M24 44h24" stroke="url(#grad1)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2>Drop Extension File Here</h2>
+        <p>Upload a Chrome extension (.crx or .zip) for deep security analysis<br>All processing happens locally in your browser &mdash; zero data leaves your machine</p>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap;position:relative;z-index:1">
+          <button class="btn btn-primary" onclick="event.stopPropagation();document.getElementById('crxFile').click()">
+            Choose File
+          </button>
+          <label class="upload-alt" for="crxFile" onclick="event.stopPropagation()">
+            <svg viewBox="0 0 14 14"><path d="M7 1v8M3 5l4-4 4 4M1 11h12v2H1z"/></svg>
+            Browse
+          </label>
+          <input type="file" id="crxFile" accept=".crx,.zip" onchange="handleFile(event)">
+        </div>
+      </div>
+      <div class="features-grid">
+        <div class="feature-item stagger-1"><div class="feature-title"><div class="feature-dot" style="background:var(--accent)"></div>Manifest Analysis</div><div class="feature-desc">Permissions, CSP, host access, update URLs, WAR exposure</div></div>
+        <div class="feature-item stagger-2"><div class="feature-title"><div class="feature-dot" style="background:var(--yellow)"></div>JS Static Analysis</div><div class="feature-desc">eval, XSS sinks, obfuscation detection, RCE patterns</div></div>
+        <div class="feature-item stagger-3"><div class="feature-title"><div class="feature-dot" style="background:var(--orange)"></div>HTML Scanning</div><div class="feature-desc">Inline scripts, external iframes, form exfiltration</div></div>
+        <div class="feature-item stagger-4"><div class="feature-title"><div class="feature-dot" style="background:var(--accent3)"></div>Network Mapping</div><div class="feature-desc">All URLs, IPs, WebSocket endpoints, CDN dependencies</div></div>
+        <div class="feature-item stagger-5"><div class="feature-title"><div class="feature-dot" style="background:var(--accent2)"></div>Privacy Audit</div><div class="feature-desc">Keyloggers, canvas fingerprinting, cookie/session access</div></div>
+        <div class="feature-item"><div class="feature-title"><div class="feature-dot" style="background:var(--red)"></div>Secret Detection</div><div class="feature-desc">20+ patterns — API keys, tokens, private keys, DB strings</div></div>
+      </div>
+    </div>
+
+    <!-- LOADER -->
+    <div id="sec-loader" class="hidden">
+      <div class="loader-wrap">
+        <div class="spinner-ring">
+          <svg viewBox="0 0 52 52">
+            <circle class="spinner-track" cx="26" cy="26" r="22" fill="none" stroke-width="3"/>
+            <circle class="spinner-arc" cx="26" cy="26" r="22" fill="none" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="loader-title">Analyzing Extension</div>
+        <div class="loader-step" id="loader-step">Initializing...</div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- CONTENT SECTIONS -->
+    <div id="sec-overview" class="hidden"></div>
+    <div id="sec-findings" class="hidden"></div>
+    <div id="sec-manifest" class="hidden"></div>
+    <div id="sec-js" class="hidden"></div>
+    <div id="sec-html" class="hidden"></div>
+    <div id="sec-network" class="hidden"></div>
+    <div id="sec-privacy" class="hidden"></div>
+    <div id="sec-secrets" class="hidden"></div>
+    <div id="sec-files" class="hidden"></div>
+    <div id="sec-report" class="hidden"></div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let STATE={files:{},manifest:null,findings:[],urls:[],score:0,extName:'',extVersion:'',mKey:''};
+
+// ─── NAV ─────────────────────────────────────────────────────────────────────
+function showSection(name){
+  const sections=['overview','findings','manifest','js','html','network','privacy','secrets','files','report'];
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const ni=document.getElementById('nav-'+name); if(ni) ni.classList.add('active');
+  sections.forEach(s=>{ const el=document.getElementById('sec-'+s); if(el) el.classList.toggle('hidden',s!==name); });
+}
+
+// ─── FILE HANDLING ───────────────────────────────────────────────────────────
+function handleDrag(e,over){e.preventDefault();document.getElementById('dropzone').classList.toggle('drag',over);}
+function handleDrop(e){e.preventDefault();document.getElementById('dropzone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f) processFile(f);}
+function handleFile(e){const f=e.target.files[0];if(f) processFile(f);}
+
+async function processFile(file){
+  document.getElementById('sec-upload').classList.add('hidden');
+  document.getElementById('sec-loader').classList.remove('hidden');
+  document.getElementById('risk-summary-sidebar').style.display='none';
+  STATE={files:{},manifest:null,findings:[],urls:[],score:0,extName:'',extVersion:'',mKey:''};
+  try{
+    setStep('Reading file...');await delay(80);
+    const buf=await file.arrayBuffer();
+    let zipData=buf;
+    const sig=new Uint8Array(buf,0,4);
+    if(sig[0]===0x43&&sig[1]===0x72&&sig[2]===0x78&&sig[3]===0x21){
+      setStep('Parsing CRX header...');
+      const view=new DataView(buf);
+      const version=view.getUint32(4,true);
+      let off=16;
+      if(version===3){const hl=view.getUint32(8,true);off=12+hl;}
+      else if(version===2){const pk=view.getUint32(8,true),sl=view.getUint32(12,true);off=16+pk+sl;}
+      zipData=buf.slice(off);
+    }
+    setStep('Unzipping extension...');setProgress(10);await delay(80);
+    const zip=await JSZip.loadAsync(zipData);
+    const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
+    for(let i=0;i<names.length;i++){
+      const n=names[i];
+      if(i%5===0){setStep(`Reading files... (${i+1}/${names.length})`);setProgress(10+(i/names.length)*20);await delay(10);}
+      const lower=n.toLowerCase();
+      if(lower.endsWith('.js')||lower.endsWith('.html')||lower.endsWith('.htm')||lower.endsWith('.json')||lower.endsWith('.css')||lower.endsWith('.ts')||lower.endsWith('.mjs')){
+        try{STATE.files[n]=await zip.files[n].async('string');}catch(_){STATE.files[n]='';}
+      }else{STATE.files[n]='[binary]';}
+    }
+    setStep('Parsing manifest...');setProgress(32);await delay(60);analyzeManifest();
+    setStep('Scanning JavaScript...');setProgress(46);await delay(60);analyzeJS();
+    setStep('Scanning HTML files...');setProgress(60);await delay(60);analyzeHTML();
+    setStep('Mapping network endpoints...');setProgress(72);await delay(60);analyzeNetwork();
+    setStep('Privacy & fingerprinting audit...');setProgress(83);await delay(60);analyzePrivacy();
+    setStep('Hunting for secrets...');setProgress(92);await delay(60);analyzeSecrets();
+    setStep('Computing risk score...');setProgress(98);await delay(80);computeScore();
+    setStep('Building report...');setProgress(100);await delay(120);
+    renderAll();
+    document.getElementById('sec-loader').classList.add('hidden');
+    showSection('overview');
+    document.getElementById('risk-summary-sidebar').style.display='block';
+  }catch(err){
+    document.getElementById('sec-loader').classList.add('hidden');
+    document.getElementById('sec-upload').classList.remove('hidden');
+    alert('Error: '+err.message+'\nEnsure the file is a valid .crx or .zip extension.');
+  }
+}
+function setStep(s){document.getElementById('loader-step').textContent=s;}
+function setProgress(p){document.getElementById('progress-fill').style.width=p+'%';}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ─── PERM DB ─────────────────────────────────────────────────────────────────
+const PERM_DB={
+  "<all_urls>":{risk:"critical",desc:"Access to ALL websites. Allows reading/modifying any page and intercepting all network requests."},
+  "debugger":{risk:"critical",desc:"Attaches Chrome debugger to any tab. Can intercept all network traffic and execute arbitrary JS."},
+  "nativeMessaging":{risk:"critical",desc:"Communicates with native desktop apps. Can execute OS-level commands and access the filesystem."},
+  "proxy":{risk:"critical",desc:"Controls Chrome's proxy settings, redirecting all traffic through attacker-controlled servers."},
+  "webRequestBlocking":{risk:"critical",desc:"Modifies/blocks network requests in real-time. Can strip HTTPS, inject content, or redirect requests."},
+  "webRequest":{risk:"high",desc:"Observes all network requests including auth headers, cookies, and request bodies."},
+  "declarativeNetRequest":{risk:"high",desc:"Can block or redirect network requests."},
+  "cookies":{risk:"high",desc:"Full access to all cookies across domains. Can steal session tokens and auth cookies."},
+  "history":{risk:"high",desc:"Reads and modifies full browser history. Severe privacy violation."},
+  "identity":{risk:"high",desc:"Access to user's Google OAuth tokens. Can impersonate the user on Google services."},
+  "scripting":{risk:"high",desc:"Injects scripts into web pages. Can capture form data, passwords, and sensitive content."},
+  "contentSettings":{risk:"high",desc:"Modifies per-site security settings like JS execution, cookies, and plugins."},
+  "clipboardRead":{risk:"high",desc:"Reads clipboard — may capture passwords, private keys, 2FA codes."},
+  "geolocation":{risk:"high",desc:"Access to precise physical location."},
+  "management":{risk:"high",desc:"Can disable or uninstall other extensions, including security tools."},
+  "pageCapture":{risk:"high",desc:"Saves full web pages including sensitive content."},
+  "privacy":{risk:"high",desc:"Modifies Chrome's privacy/tracking protection settings."},
+  "browsingData":{risk:"high",desc:"Can delete cookies, cache, history, and passwords."},
+  "tabs":{risk:"medium",desc:"Access to tab URLs, titles, and favicons. Reveals browsing activity."},
+  "clipboardWrite":{risk:"medium",desc:"Writes to clipboard. Can replace content users intend to paste."},
+  "downloads":{risk:"medium",desc:"Manages downloads. Can trigger file downloads to the user's machine."},
+  "bookmarks":{risk:"medium",desc:"Read/write access to all bookmarks."},
+  "webNavigation":{risk:"medium",desc:"Monitors all navigation events in real-time. Can track every URL visited."},
+  "topSites":{risk:"medium",desc:"Accesses the user's most visited sites."},
+  "sessions":{risk:"medium",desc:"Access to recently closed tabs and session data."},
+  "background":{risk:"medium",desc:"Keeps extension alive persistently in background."},
+  "notifications":{risk:"low",desc:"Displays desktop notifications. Could be used for phishing popups."},
+  "activeTab":{risk:"low",desc:"Temporary access to the current tab when user clicks."},
+  "storage":{risk:"low",desc:"Stores extension data."},
+  "alarms":{risk:"low",desc:"Schedules code execution."},
+  "contextMenus":{risk:"low",desc:"Adds right-click menu items."},
+};
+
+// ─── ANALYSIS ────────────────────────────────────────────────────────────────
+function addFinding(category,severity,title,file,desc,snippet=''){
+  STATE.findings.push({category,severity,title,file,desc,snippet:snippet.substring(0,300),id:STATE.findings.length});
+}
+
+function analyzeManifest(){
+  const mKey=Object.keys(STATE.files).find(k=>k==='manifest.json'||k.toLowerCase().endsWith('/manifest.json'));
+  const mFile=mKey?STATE.files[mKey]:null;
+  if(!mFile){addFinding('manifest','critical','manifest.json Not Found','—','Could not locate manifest.json in the extension package.');return;}
+  STATE.mKey=mKey||'manifest.json';
+  const MF=STATE.mKey;
+  try{STATE.manifest=JSON.parse(mFile);}catch(e){addFinding('manifest','critical','Invalid manifest.json',MF,'Could not parse: '+e.message);return;}
+  const m=STATE.manifest;
+  STATE.extName=m.name||'Unknown Extension';
+  STATE.extVersion=m.version||'?';
+  const allPerms=[...(m.permissions||[]),...(m.optional_permissions||[]),...(m.host_permissions||[])];
+  allPerms.forEach(p=>{const info=PERM_DB[p];if(info&&['critical','high'].includes(info.risk))addFinding('manifest',info.risk,'Dangerous Permission: '+p,MF,info.desc,`"${p}"`);});
+  if(m.manifest_version<3)addFinding('manifest','high','Manifest V2 (Deprecated)',MF,'Manifest V2 allows synchronous blocking webRequest and remote code execution via eval.','manifest_version: '+m.manifest_version);
+  const csp=m.content_security_policy,cspStr=JSON.stringify(csp||'');
+  if(cspStr.includes("'unsafe-eval'"))addFinding('manifest','critical','CSP allows unsafe-eval',MF,"'unsafe-eval' enables dynamic code execution via eval() — major XSS vector.",cspStr.substring(0,200));
+  if(cspStr.includes("'unsafe-inline'"))addFinding('manifest','high','CSP allows unsafe-inline',MF,"'unsafe-inline' allows inline scripts, defeating CSP protection.",cspStr.substring(0,200));
+  if(!csp)addFinding('manifest','medium','No Content Security Policy',MF,'No CSP defined. Extension uses permissive defaults.');
+  if(m.update_url&&m.update_url.startsWith('http:'))addFinding('manifest','critical','HTTP Update URL — MITM Risk',MF,'Update URL uses HTTP. Attacker can intercept and inject malicious extension.',m.update_url);
+  (m.web_accessible_resources||[]).forEach((w,i)=>{const matches=w.matches||[];if(matches.includes('<all_urls>')||matches.some(u=>u==='*://*/*'))addFinding('manifest','high','WAR Exposed to All Origins',`${MF} [WAR #${i}]`,`Resources [${(w.resources||[]).join(', ')}] exposed to any website — enables fingerprinting.`,JSON.stringify(w).substring(0,200));});
+  (m.content_scripts||[]).forEach((s,i)=>{
+    if((s.matches||[]).includes('<all_urls>'))addFinding('manifest','high','Content Script Injected on All URLs',`${MF} [cs #${i}]`,`Scripts [${(s.js||[]).join(', ')}] run on ALL websites at ${s.run_at||'document_idle'}.`,JSON.stringify(s).substring(0,200));
+    if(s.run_at==='document_start')addFinding('manifest','medium','Content Script at document_start',`${MF} [cs #${i}]`,'Script runs before DOM is built — can intercept sensitive page load events.');
+  });
+  if(m.externally_connectable)addFinding('manifest','medium','externally_connectable Defined',MF,'Allows external websites to send messages to this extension.',JSON.stringify(m.externally_connectable));
+  if((m.permissions||[]).includes('nativeMessaging')&&!m.key)addFinding('manifest','medium','nativeMessaging Without Locked ID',MF,'No "key" field — another extension could spoof the native app connection.');
+}
+
+const JS_RULES=[
+  {sev:'critical',cat:'js',title:'eval() Usage',re:/\beval\s*\(/g,desc:'eval() executes arbitrary strings as code. If attacker-controlled input reaches eval(), it leads to Remote Code Execution.'},
+  {sev:'critical',cat:'js',title:'new Function() Usage',re:/new\s+Function\s*\(/g,desc:'new Function() is equivalent to eval() — executing dynamic strings as code.'},
+  {sev:'critical',cat:'js',title:'Dynamic Script Injection',re:/createElement\s*\(\s*['"`]script['"`]\s*\)/g,desc:'Dynamically creating script elements can load and execute remote or attacker-controlled code.'},
+  {sev:'critical',cat:'js',title:'fetch() + eval() Pattern',re:/fetch\s*\([\s\S]{0,200}eval\s*\(/g,desc:'Fetching remote content and executing it via eval() — classic Remote Code Execution pattern.'},
+  {sev:'high',cat:'js',title:'innerHTML Assignment',re:/\.innerHTML\s*[+]?=/g,desc:'Assigning to innerHTML can introduce XSS if content includes user or attacker-controlled data.'},
+  {sev:'high',cat:'js',title:'outerHTML Assignment',re:/\.outerHTML\s*=/g,desc:'Same XSS risk as innerHTML assignment.'},
+  {sev:'high',cat:'js',title:'document.write()',re:/document\.write\s*\(/g,desc:'Classic XSS vector when called with untrusted content.'},
+  {sev:'high',cat:'js',title:'setTimeout with String Argument',re:/set(?:Timeout|Interval)\s*\(\s*["'`]/g,desc:'Passing a string to setTimeout/setInterval causes eval-like dynamic code execution.'},
+  {sev:'high',cat:'js',title:'chrome.tabs.executeScript()',re:/chrome\.tabs\.executeScript\s*\(/g,desc:'Executes script in a tab context — high risk if script content is dynamic.'},
+  {sev:'high',cat:'js',title:'chrome.scripting.executeScript()',re:/chrome\.scripting\.executeScript\s*\(/g,desc:'Injects and executes scripts into page context — review the code being injected.'},
+  {sev:'high',cat:'js',title:'postMessage to Wildcard Origin',re:/postMessage\s*\([^)]*,\s*['"]\*['"]/g,desc:'postMessage(*) sends data to any origin — attacker-controlled frames can receive sensitive data.'},
+  {sev:'high',cat:'js',title:'chrome.cookies.getAll()',re:/chrome\.cookies\.getAll\s*\(/g,desc:'Retrieves ALL cookies. High risk of session hijacking.'},
+  {sev:'high',cat:'js',title:'chrome.history.search()',re:/chrome\.history\.search\s*\(/g,desc:'Reads browser history. Major privacy violation.'},
+  {sev:'high',cat:'js',title:'chrome.identity.getAuthToken()',re:/chrome\.identity\.getAuthToken\s*\(/g,desc:'Retrieves OAuth tokens for the signed-in user.'},
+  {sev:'high',cat:'js',title:'String.fromCharCode() Obfuscation',re:/String\.fromCharCode\s*\(/g,desc:'Heavily used in obfuscated/malicious code to construct strings character by character.'},
+  {sev:'high',cat:'js',title:'Hex-Encoded String',re:/\\x[0-9a-f]{2}(?:\\x[0-9a-f]{2}){9,}/gi,desc:'Long hex-encoded strings — common technique to hide URLs or payloads from static scanners.'},
+  {sev:'medium',cat:'js',title:'insertAdjacentHTML()',re:/insertAdjacentHTML\s*\(/g,desc:'Parses HTML — XSS risk if content is untrusted.'},
+  {sev:'medium',cat:'js',title:'postMessage Without Origin Check',re:/addEventListener\s*\(\s*['"`]message['"`]/g,desc:'Message event listener detected — verify it validates event.origin before processing.'},
+  {sev:'medium',cat:'js',title:'fetch() to External URL',re:/fetch\s*\(\s*[`'"](https?:\/\/[^`'"]+)/g,desc:'Data is being sent/fetched from external URLs — verify the destination is legitimate.'},
+  {sev:'medium',cat:'js',title:'XMLHttpRequest Usage',re:/new\s+XMLHttpRequest\s*\(\)/g,desc:'XHR detected — review what data is sent and to which endpoints.'},
+  {sev:'medium',cat:'js',title:'chrome.tabs.query()',re:/chrome\.tabs\.query\s*\(/g,desc:'Reads open tab information. Combined with network calls can leak browsing activity.'},
+  {sev:'medium',cat:'js',title:'chrome.downloads.download()',re:/chrome\.downloads\.download\s*\(/g,desc:'Triggers a file download — could drop malicious files.'},
+  {sev:'medium',cat:'js',title:'Base64 Decode (atob)',re:/\batob\s*\(/g,desc:'atob() decodes base64 — commonly used to hide malicious strings from static analysis.'},
+  {sev:'medium',cat:'js',title:'unescape() Usage',re:/\bunescape\s*\(/g,desc:'unescape() is deprecated and commonly used to encode malicious payloads.'},
+  {sev:'medium',cat:'js',title:'WebSocket Connection',re:/new\s+WebSocket\s*\(\s*['"`](wss?:\/\/[^'"`]+)/g,desc:'WebSocket connection — review endpoint and data transmitted in real-time.'},
+  {sev:'low',cat:'js',title:'charCodeAt() Usage',re:/\.charCodeAt\s*\(/g,desc:'Used in some obfuscation schemes to manipulate characters.'},
+];
+
+function analyzeJS(){
+  const jsFiles=Object.keys(STATE.files).filter(f=>f.toLowerCase().endsWith('.js')||f.toLowerCase().endsWith('.mjs'));
+  jsFiles.forEach(fname=>{
+    const src=STATE.files[fname];
+    if(!src||src==='[binary]') return;
+    const lines=src.split('\n');
+    JS_RULES.forEach(rule=>{
+      let m;const re=new RegExp(rule.re.source,rule.re.flags);
+      while((m=re.exec(src))!==null){
+        const ln=src.substring(0,m.index).split('\n').length;
+        addFinding(rule.cat,rule.sev,rule.title,`${fname}:${ln}`,rule.desc,(lines[ln-1]||'').trim());
+      }
+    });
+    if(calcEntropy(src)>5.2&&src.length>500)addFinding('js','high','High Entropy — Possible Obfuscation',fname,'Unusually high Shannon entropy. Strong indicator of obfuscated or packed code.',src.substring(0,150));
+    if(lines.some(l=>l.length>5000))addFinding('js','medium','Extremely Long Code Lines',fname,'Lines over 5000 chars detected — common in obfuscated code designed to evade static analysis.',lines.find(l=>l.length>5000).substring(0,150));
+    if(/(addEventListener\s*\(\s*['"`]key(?:down|up|press)['"`])/.test(src)){
+      const hasNet=/fetch\s*\(|XMLHttpRequest|sendMessage/.test(src);
+      addFinding('privacy',hasNet?'critical':'high',hasNet?'Keylogger Pattern Detected':'Keyboard Event Listener Detected',fname,hasNet?'Keyboard events + network calls — strong keylogger pattern. Keystrokes may be exfiltrated.':'Keyboard event listener. If combined with network calls elsewhere, constitutes a keylogger.',src.match(/(addEventListener\s*\(\s*['"`]key(?:down|up|press)['"`])/)?.[0]||'');
+    }
+  });
+}
+
+function calcEntropy(s){const f={};for(const c of s)f[c]=(f[c]||0)+1;const l=s.length;return -Object.values(f).reduce((a,v)=>{const p=v/l;return a+p*Math.log2(p);},0);}
+
+function analyzeHTML(){
+  Object.keys(STATE.files).filter(f=>f.toLowerCase().endsWith('.html')||f.toLowerCase().endsWith('.htm')).forEach(fname=>{
+    const src=STATE.files[fname];
+    if(!src||src==='[binary]') return;
+    if(/<script[^>]*src\s*=\s*['"]https?:\/\//.test(src))addFinding('html','critical','Remote Script Source',fname,'HTML loads a script from an external URL — remote scripts can be modified by the server or CDN.',src.match(/<script[^>]*src\s*=\s*['"]https?:\/\/[^'"]+/)?.[0]||'');
+    if(/<script(?![^>]*src)[^>]*>(?!<\/script>)/.test(src))addFinding('html','high','Inline Script Tag',fname,'Inline JavaScript violates CSP best practices and can hide malicious logic.',src.match(/<script[^>]*>[\s\S]{1,100}/)?.[0]||'');
+    if(/<iframe[^>]*src\s*=\s*['"]https?:\/\//.test(src))addFinding('html','high','External iframe',fname,'iframe loading external content — clickjacking, phishing, or postMessage data exfiltration risk.',src.match(/<iframe[^>]*src\s*=\s*['"]https?:\/\/[^'"]+/)?.[0]||'');
+    if(/<form[^>]*action\s*=\s*['"]https?:\/\//.test(src))addFinding('html','critical','Form Posting to External URL',fname,'HTML form submits to an external domain — user data including passwords may be exfiltrated.',src.match(/<form[^>]*action\s*=\s*['"]https?:\/\/[^'"]+/)?.[0]||'');
+    if(/<link[^>]*href\s*=\s*['"]https?:\/\//.test(src))addFinding('html','medium','External Stylesheet',fname,'External CSS can perform side-channel attacks (CSS injection, visited-link detection).',src.match(/<link[^>]*href\s*=\s*['"]https?:\/\/[^'"]+/)?.[0]||'');
+    if(/<meta[^>]*http-equiv\s*=\s*['"]refresh['"]/.test(src))addFinding('html','medium','Meta Refresh Redirect',fname,'meta http-equiv=refresh can redirect users to external phishing pages.',src.match(/<meta[^>]*refresh[^>]*>/i)?.[0]||'');
+    if(/on\w+\s*=\s*["'][^"']*["']/i.test(src))addFinding('html','high','Inline Event Handlers',fname,'Inline event handlers (onclick, onload etc.) violate CSP and may execute untrusted code.',src.match(/on\w+\s*=\s*["'][^"']{1,80}/i)?.[0]||'');
+  });
+}
+
+function analyzeNetwork(){
+  const urls=new Map();
+  const URL_RE=/(['"`])((?:https?|wss?|ftp):\/\/[a-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+)\1/gi;
+  Object.entries(STATE.files).filter(([,v])=>v!=='[binary]').forEach(([fname,src])=>{
+    let m;const re=new RegExp(URL_RE.source,URL_RE.flags);
+    while((m=re.exec(src))!==null){const u=m[2];if(!urls.has(u))urls.set(u,[]);urls.get(u).push(fname);}
+  });
+  if(STATE.manifest){
+    const addU=(u,s)=>{if(!urls.has(u))urls.set(u,[]);urls.get(u).push(s);};
+    const MF=STATE.mKey;
+    (STATE.manifest.host_permissions||[]).forEach(u=>addU(u,MF));
+    (STATE.manifest.content_scripts||[]).forEach((cs,i)=>(cs.matches||[]).forEach(u=>addU(u,`${MF}[cs#${i}]`)));
+    if(STATE.manifest.update_url)addU(STATE.manifest.update_url,MF);
+  }
+  STATE.urls=[...urls.entries()].map(([url,files])=>({url,files}));
+  STATE.urls.forEach(({url,files})=>{
+    if(url.startsWith('http:')&&!url.includes('localhost')&&!url.includes('127.0.0.1'))addFinding('network','high','Insecure HTTP URL',files[0],'Communication over HTTP is vulnerable to MITM, eavesdropping, and content injection.',url);
+    if(/\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/.test(url))addFinding('network','medium','Hardcoded IP Address',files[0],'Hardcoded IPs bypass DNS reputation checks and indicate hidden infrastructure.',url);
+    if(/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(url))addFinding('network','low','Localhost Reference',files[0],'Reference to localhost — may indicate native app communication or debug code.',url);
+  });
+}
+
+function analyzePrivacy(){
+  const PRIV=[
+    {re:/document\.cookie/g,sev:'high',title:'document.cookie Access',desc:'Direct cookie access. Can read session tokens and auth cookies in page context.'},
+    {re:/localStorage\.(get|set)Item/g,sev:'medium',title:'localStorage Access',desc:'Reading/writing localStorage. May access sensitive website data.'},
+    {re:/sessionStorage\.(get|set)Item/g,sev:'medium',title:'sessionStorage Access',desc:'Reading/writing sessionStorage.'},
+    {re:/navigator\.(?:plugins|mimeTypes)/g,sev:'medium',title:'Plugin Fingerprinting',desc:'Reads browser plugins list — used for device fingerprinting across sites.'},
+    {re:/canvas\.toDataURL|getImageData/g,sev:'high',title:'Canvas Fingerprinting',desc:'Creates unique device fingerprints by rendering images and reading pixel data.'},
+    {re:/AudioContext|OfflineAudioContext/g,sev:'high',title:'Audio Fingerprinting',desc:'Generates unique audio signatures to track users across sessions.'},
+    {re:/RTCPeerConnection/g,sev:'high',title:'WebRTC IP Leak',desc:'RTCPeerConnection can expose real IP addresses even behind a VPN.'},
+    {re:/navigator\.(?:hardwareConcurrency|deviceMemory)/g,sev:'medium',title:'Hardware Fingerprinting',desc:'Reading hardware properties (CPU cores, memory) for fingerprinting.'},
+    {re:/chrome\.tabs\.captureVisibleTab/g,sev:'critical',title:'Screen Capture Detected',desc:'Captures a screenshot of the active tab — can capture banking, email, or any sensitive page.'},
+    {re:/window\.name/g,sev:'medium',title:'window.name Access',desc:'window.name persists across navigations — can be used as a covert data channel.'},
+    {re:/performance\.timing|performance\.getEntries/g,sev:'medium',title:'Timing API Access',desc:'Can be used for timing-based side channel attacks.'},
+    {re:/indexedDB/g,sev:'medium',title:'IndexedDB Access',desc:'Accessing IndexedDB. Can read data stored by websites in page context.'},
+    {re:/chrome\.history/g,sev:'critical',title:'Browser History Access',desc:'Directly accessing chrome.history — full browsing history exposure.'},
+    {re:/chrome\.bookmarks/g,sev:'high',title:'Bookmark Access',desc:'Reading/modifying bookmarks — reveals browsing habits and private sites.'},
+    {re:/navigator\.userAgent/g,sev:'low',title:'User Agent Fingerprinting',desc:'Reads navigator.userAgent for browser identification.'},
+    {re:/screen\.(?:width|height|colorDepth|pixelDepth)/g,sev:'low',title:'Screen Property Fingerprinting',desc:'Reading screen dimensions — common fingerprinting vector.'},
+  ];
+  Object.entries(STATE.files).filter(([,v])=>v!=='[binary]').forEach(([fname,src])=>{
+    PRIV.forEach(rule=>{
+      const re=new RegExp(rule.re.source,'g');
+      if(re.test(src))addFinding('privacy',rule.sev,rule.title,fname,rule.desc,src.match(new RegExp(rule.re.source))?.[0]||'');
+    });
+  });
+}
+
+function analyzeSecrets(){
+  const SECRETS=[
+    {re:/(?:api[_-]?key|apikey)\s*[:=]\s*['"`]([A-Za-z0-9\-_]{16,})/gi,title:'API Key'},
+    {re:/(?:secret[_-]?key|secretkey)\s*[:=]\s*['"`]([A-Za-z0-9\-_]{16,})/gi,title:'Secret Key'},
+    {re:/(?:password|passwd|pwd)\s*[:=]\s*['"`]([^'"`\s]{6,})/gi,title:'Hardcoded Password'},
+    {re:/(?:auth[_-]?token|authtoken|bearer)\s*[:=]\s*['"`]([A-Za-z0-9\-_.]{16,})/gi,title:'Auth Token'},
+    {re:/AIza[0-9A-Za-z\-_]{35}/g,title:'Google API Key'},
+    {re:/ya29\.[0-9A-Za-z\-_]+/g,title:'Google OAuth Token'},
+    {re:/sk-[A-Za-z0-9]{32,}/g,title:'OpenAI API Key'},
+    {re:/gh[pousr]_[A-Za-z0-9]{36}/g,title:'GitHub Token'},
+    {re:/xox[baprs]-[A-Za-z0-9\-]+/g,title:'Slack Token'},
+    {re:/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/g,title:'Private Key in Source'},
+    {re:/(?:aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret)\s*[:=]\s*['"`]([A-Za-z0-9+/]{16,})/gi,title:'AWS Credentials'},
+    {re:/mongodb(?:\+srv)?:\/\/[^\s'"]+/gi,title:'MongoDB Connection String'},
+    {re:/(?:mysql|postgres|postgresql|redis):\/\/[^\s'"]+/gi,title:'Database Connection String'},
+    {re:/(?:client[_-]?secret)\s*[:=]\s*['"`]([A-Za-z0-9\-_]{12,})/gi,title:'OAuth Client Secret'},
+    {re:/(?:stripe[_-]?(?:sk|pk)[_-]?(?:live|test))[A-Za-z0-9_]{16,}/gi,title:'Stripe Key'},
+    {re:/EAACEdEose0cBA[0-9A-Za-z]+/g,title:'Facebook Access Token'},
+    {re:/(?:firebase[_-]?api[_-]?key)\s*[:=]\s*['"`]([A-Za-z0-9\-_]{16,})/gi,title:'Firebase API Key'},
+  ];
+  Object.entries(STATE.files).filter(([,v])=>v!=='[binary]').forEach(([fname,src])=>{
+    SECRETS.forEach(rule=>{
+      let m;const re=new RegExp(rule.re.source,rule.re.flags.includes('g')?rule.re.flags:rule.re.flags+'g');
+      while((m=re.exec(src))!==null)addFinding('secrets','critical',rule.title+' Detected',fname,`Hardcoded ${rule.title} found. Anyone who obtains the extension can extract and abuse this credential.`,m[0].substring(0,80));
+    });
+  });
+}
+
+function computeScore(){
+  const w={critical:20,high:10,medium:4,low:1};
+  STATE.score=Math.max(0,100-STATE.findings.reduce((s,f)=>s+(w[f.severity]||0),0));
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderAll(){
+  updateCounts();renderSidebarRisk();renderOverview();renderFindings();renderManifest();
+  renderJSSection();renderHTMLSection();renderNetwork();renderPrivacy();renderSecrets();renderFiles();renderReport();
+}
+function updateCounts(){
+  const cats={findings:STATE.findings.length,js:STATE.findings.filter(f=>f.category==='js').length,html:STATE.findings.filter(f=>f.category==='html').length,network:STATE.findings.filter(f=>f.category==='network').length,privacy:STATE.findings.filter(f=>f.category==='privacy').length,secrets:STATE.findings.filter(f=>f.category==='secrets').length};
+  Object.entries(cats).forEach(([k,v])=>{const el=document.getElementById('cnt-'+k);if(el)el.textContent=v;});
+}
+function renderSidebarRisk(){
+  const sevs=['critical','high','medium','low'];
+  const colors={critical:'#ef4444',high:'#f97316',medium:'#eab308',low:'#10b981'};
+  const counts=sevs.map(s=>STATE.findings.filter(f=>f.severity===s).length);
+  const max=Math.max(...counts,1);
+  document.getElementById('sidebar-risk').innerHTML=sevs.map((s,i)=>`
+  <div class="risk-row">
+    <div class="risk-label-row">
+      <span class="risk-name" style="color:${colors[s]}">${s}</span>
+      <span class="risk-val" style="color:${colors[s]}">${counts[i]}</span>
+    </div>
+    <div class="risk-track"><div class="risk-fill" style="width:${(counts[i]/max)*100}%;background:${colors[s]}"></div></div>
+  </div>`).join('');
+}
+
+function scColor(s){return s<=30?'var(--critical)':s<=55?'var(--high)':s<=75?'var(--medium)':'var(--green)';}
+function scLabel(s){return s<=30?'CRITICAL RISK':s<=55?'HIGH RISK':s<=75?'MEDIUM RISK':'LOW RISK';}
+function badge(sev){return `<span class="badge badge-${sev}">${sev}</span>`;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtBytes(b){return b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';}
+
+function renderFindingCard(f,delay=0){
+  return `<div class="finding ${f.severity}" style="animation-delay:${delay}s" onclick="this.classList.toggle('open')">
+    <div class="finding-body">
+      <div class="finding-title">${badge(f.severity)} ${esc(f.title)}</div>
+      <div class="finding-file">${esc(f.file)}</div>
+      <div class="finding-desc">${esc(f.desc)}</div>
+      ${f.snippet?`<div class="finding-code">${esc(f.snippet)}</div>`:''}
+    </div>
+  </div>`;
+}
+
+function renderOverview(){
+  const f=STATE.findings,cnt=s=>f.filter(x=>x.severity===s).length;
+  const sc=STATE.score,col=scColor(sc),lbl=scLabel(sc);
+  const m=STATE.manifest||{};
+  const jsF=Object.keys(STATE.files).filter(n=>n.toLowerCase().endsWith('.js')).length;
+  const htmlF=Object.keys(STATE.files).filter(n=>n.toLowerCase().endsWith('.html')||n.toLowerCase().endsWith('.htm')).length;
+  const r=46,circ=2*Math.PI*r,offset=circ*(1-sc/100);
+  document.getElementById('sec-overview').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>${esc(STATE.extName)} <span class="section-subtitle">v${esc(STATE.extVersion)}</span></div>
+  <div class="score-card">
+    <div class="ring-wrap">
+      <svg viewBox="0 0 100 100">
+        <circle class="ring-track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
+        <circle class="ring-fill" cx="50" cy="50" r="${r}" fill="none" stroke="${col}" stroke-width="9"
+          stroke-dasharray="${circ}" stroke-dashoffset="${circ}" stroke-linecap="round"
+          style="stroke-dashoffset:${offset};transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
+      </svg>
+      <div class="ring-val"><div class="ring-number" style="color:${col}">${sc}</div><div class="ring-sub">/ 100</div></div>
+    </div>
+    <div class="score-info">
+      <h2 style="color:${col}">${lbl}</h2>
+      <p>Found <strong style="color:var(--critical)">${cnt('critical')} critical</strong>, <strong style="color:var(--high)">${cnt('high')} high</strong>, <strong style="color:var(--medium)">${cnt('medium')} medium</strong>, <strong style="color:var(--low)">${cnt('low')} low</strong> severity findings across ${Object.keys(STATE.files).length} files.<br>
+      ${sc<=30?'This extension exhibits multiple severe security violations. Do not install.':sc<=55?'Serious security concerns detected. Review all findings before use.':sc<=75?'Some elevated risks found. Review highlighted findings carefully.':'No major issues found. Review individual findings for full context.'}</p>
+      <div class="score-actions">
+        <button class="btn btn-primary btn-sm" onclick="showSection('findings')">View All Findings</button>
+        <button class="btn btn-ghost btn-sm" onclick="showSection('report')">Export Report</button>
+        <button class="btn btn-ghost btn-sm" onclick="location.reload()">New Scan</button>
+      </div>
+    </div>
+  </div>
+  <div class="summary-grid">
+    ${[['critical',cnt('critical'),'var(--critical)'],['high',cnt('high'),'var(--high)'],['medium',cnt('medium'),'var(--medium)'],['low',cnt('low'),'var(--green)']].map(([l,v,c],i)=>`
+    <div class="stat-box" style="animation-delay:${i*.06}s">
+      <div class="stat-val" style="color:${c}">${v}</div>
+      <div class="stat-lbl">${l}</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:${Math.min(100,(v/Math.max(STATE.findings.length,1))*100)}%;background:${c}"></div></div>
+    </div>`).join('')}
+    <div class="stat-box stagger-5"><div class="stat-val" style="color:var(--accent)">${Object.keys(STATE.files).length}</div><div class="stat-lbl">Files</div></div>
+    <div class="stat-box" style="animation-delay:.3s"><div class="stat-val" style="color:var(--accent)">${jsF}</div><div class="stat-lbl">JS Files</div></div>
+    <div class="stat-box" style="animation-delay:.35s"><div class="stat-val" style="color:var(--accent)">${htmlF}</div><div class="stat-lbl">HTML Files</div></div>
+    <div class="stat-box" style="animation-delay:.4s"><div class="stat-val" style="color:var(--accent2)">${STATE.urls.length}</div><div class="stat-lbl">URLs Found</div></div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Top Critical Findings</div></div>
+    ${f.filter(x=>x.severity==='critical').slice(0,5).map((x,i)=>renderFindingCard(x,i*.05)).join('')||emptyState('No critical findings')}
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Extension Metadata</div></div>
+    <div class="meta-grid">
+      ${[['Name',m.name||'—'],['Version',m.version||'—'],['Manifest V',m.manifest_version||'—'],['Author',m.author||'Not specified'],['Background',m.background?.service_worker||m.background?.scripts?.join(',')||'None'],['Permissions',(m.permissions||[]).length+' declared']].map(([k,v])=>`<div class="meta-item"><div class="meta-key">${k}</div><div class="meta-val">${esc(String(v))}</div></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function emptyState(msg){return `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 18 18"><path d="M9 3v6M9 12v.5"/><circle cx="9" cy="9" r="7.5"/></svg></div>${msg}</div>`;}
+
+function renderFindings(){
+  const ord={critical:0,high:1,medium:2,low:3,info:4};
+  const sorted=[...STATE.findings].sort((a,b)=>(ord[a.severity]||4)-(ord[b.severity]||4));
+  document.getElementById('sec-findings').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>All Findings <span class="section-subtitle">${STATE.findings.length} total</span></div>
+  <div class="filter-bar">
+    ${['all','critical','high','medium','low'].map(s=>`<button class="filter-btn${s==='all'?' active':''}" onclick="filterFindings('${s}',this)">${s==='all'?'All ':s.charAt(0).toUpperCase()+s.slice(1)+' '}${s==='all'?STATE.findings.length:STATE.findings.filter(f=>f.severity===s).length}</button>`).join('')}
+  </div>
+  <div id="findings-list">${sorted.map((f,i)=>renderFindingCard(f,i*.02)).join('')||emptyState('No findings')}</div>`;
+}
+
+function filterFindings(sev,btn){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const ord={critical:0,high:1,medium:2,low:3,info:4};
+  const items=(sev==='all'?STATE.findings:STATE.findings.filter(f=>f.severity===sev)).sort((a,b)=>(ord[a.severity]||4)-(ord[b.severity]||4));
+  document.getElementById('findings-list').innerHTML=items.map((f,i)=>renderFindingCard(f,i*.02)).join('')||emptyState('No findings at this level');
+}
+
+function renderManifest(){
+  const m=STATE.manifest;
+  if(!m){document.getElementById('sec-manifest').innerHTML=emptyState('No manifest.json found');return;}
+  const allPerms=[...(m.permissions||[]),...(m.optional_permissions||[]),...(m.host_permissions||[])];
+  const ord={critical:0,high:1,medium:2,low:3};
+  const sorted=allPerms.slice().sort((a,b)=>(ord[PERM_DB[a]?.risk||'low']||3)-(ord[PERM_DB[b]?.risk||'low']||3));
+  document.getElementById('sec-manifest').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>Manifest Analysis</div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Permissions (${allPerms.length})</div></div>
+    ${sorted.map((p,i)=>{const info=PERM_DB[p]||{risk:'low',desc:'Extension permission'};const isOpt=(m.optional_permissions||[]).includes(p);const isHost=(m.host_permissions||[]).includes(p);
+    return `<div class="finding ${info.risk}" style="animation-delay:${i*.03}s"><div class="finding-body">
+      <div class="finding-title">${badge(info.risk)} ${esc(p)} ${isOpt?badge('info')+'&nbsp;optional':''} ${isHost?badge('info')+'&nbsp;host':''}</div>
+      <div class="finding-desc">${info.desc}</div>
+    </div></div>`;}).join('')||emptyState('No permissions declared')}
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Raw manifest.json</div></div>
+    <pre class="report-pre">${esc(JSON.stringify(m,null,2))}</pre>
+  </div>`;
+}
+
+function renderCategorySection(id,label,cat){
+  const items=STATE.findings.filter(f=>f.category===cat).sort((a,b)=>({critical:0,high:1,medium:2,low:3}[a.severity]||3)-({critical:0,high:1,medium:2,low:3}[b.severity]||3));
+  document.getElementById('sec-'+id).innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>${label} <span class="section-subtitle">${items.length} finding${items.length!==1?'s':''}</span></div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Findings</div></div>
+    ${items.map((f,i)=>renderFindingCard(f,i*.03)).join('')||emptyState('No issues detected')}
+  </div>`;
+}
+function renderJSSection(){renderCategorySection('js','JavaScript Analysis','js');}
+function renderHTMLSection(){renderCategorySection('html','HTML Analysis','html');}
+function renderPrivacy(){renderCategorySection('privacy','Privacy & Fingerprinting','privacy');}
+function renderSecrets(){
+  const sf=STATE.findings.filter(f=>f.category==='secrets');
+  document.getElementById('sec-secrets').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>Secrets & Credentials <span class="section-subtitle">${sf.length} finding${sf.length!==1?'s':''}</span></div>
+  ${sf.length?`<div class="card" style="border-color:rgba(239,68,68,0.3)">
+    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12.5px;color:#fca5a5;line-height:1.6">
+      Hardcoded credentials detected. Anyone who obtains this extension package can extract and abuse these secrets.
+    </div>
+    ${sf.map((f,i)=>renderFindingCard(f,i*.03)).join('')}
+  </div>`:`<div class="card">${emptyState('No hardcoded secrets detected')}</div>`}`;
+}
+
+function renderNetwork(){
+  const nf=STATE.findings.filter(f=>f.category==='network');
+  const ext=STATE.urls.filter(u=>!u.url.includes('localhost')&&!u.url.includes('127.0.0.1'));
+  const ins=STATE.urls.filter(u=>u.url.startsWith('http:')&&!u.url.includes('localhost'));
+  const wc=STATE.urls.filter(u=>u.url.includes('*'));
+  document.getElementById('sec-network').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>Network & URL Analysis</div>
+  <div class="summary-grid">
+    ${[['Total URLs',STATE.urls.length,'var(--accent)'],['External',ext.length,'var(--orange)'],['HTTP (Insecure)',ins.length,'var(--red)'],['Wildcards',wc.length,'var(--red)']].map(([l,v,c],i)=>`<div class="stat-box" style="animation-delay:${i*.05}s"><div class="stat-val" style="color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`).join('')}
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Network Findings</div></div>
+    ${nf.map((f,i)=>renderFindingCard(f,i*.03)).join('')||emptyState('No network vulnerabilities found')}
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>All Extracted URLs (${STATE.urls.length})</div></div>
+    <div style="display:flex;flex-wrap:wrap">
+      ${STATE.urls.map(({url})=>{const cls=url.includes('*')||url==='<all_urls>'?'danger':url.startsWith('http:')?'warn':'';return `<span class="url-chip ${cls}" title="${esc(url)}">${esc(url)}</span>`;}).join('')||'<div style="color:var(--text3);font-size:13px;padding:10px">No URLs found</div>'}
+    </div>
+  </div>`;
+}
+
+function renderFiles(){
+  const extIcon=n=>{const e=n.split('.').pop().toLowerCase();return {js:'ext-js',html:'ext-html',htm:'ext-html',json:'ext-json',css:'ext-css',png:'ext-img',jpg:'ext-img',gif:'ext-img',svg:'ext-img',webp:'ext-img'}[e]||'ext-other';};
+  const entries=Object.entries(STATE.files).sort(([a],[b])=>a.localeCompare(b));
+  document.getElementById('sec-files').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>File Tree <span class="section-subtitle">${entries.length} files</span></div>
+  <div class="card">
+    ${entries.map(([name,content],i)=>{
+      const e=name.split('.').pop().toLowerCase();
+      const ic=extIcon(name);
+      const size=content==='[binary]'?'binary':fmtBytes(new Blob([content]).size);
+      const issues=STATE.findings.filter(f=>f.file.startsWith(name)).length;
+      return `<div class="file-item" style="animation-delay:${i*.01}s">
+        <span class="file-ext ${ic}">${e}</span>
+        <span style="flex:1">${esc(name)}</span>
+        ${issues?`<span class="badge badge-${issues>3?'critical':'high'}" style="flex-shrink:0;margin-right:4px">${issues}</span>`:''}
+        <span class="file-size">${size}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderReport(){
+  const report={
+    generated:new Date().toISOString(),
+    extension:{name:STATE.extName,version:STATE.extVersion,manifest_version:STATE.manifest?.manifest_version},
+    score:STATE.score,risk_label:scLabel(STATE.score),
+    summary:{critical:STATE.findings.filter(f=>f.severity==='critical').length,high:STATE.findings.filter(f=>f.severity==='high').length,medium:STATE.findings.filter(f=>f.severity==='medium').length,low:STATE.findings.filter(f=>f.severity==='low').length,total:STATE.findings.length},
+    urls_found:STATE.urls.length,files_analyzed:Object.keys(STATE.files).length,
+    findings:STATE.findings.map(f=>({severity:f.severity,category:f.category,title:f.title,file:f.file,description:f.desc,snippet:f.snippet}))
+  };
+  window._reportStr=JSON.stringify(report,null,2);
+  document.getElementById('sec-report').innerHTML=`
+  <div class="section-title"><div class="section-title-accent"></div>Export Security Report</div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>JSON Report</div></div>
+    <p style="font-size:12.5px;color:var(--text3);margin-bottom:14px;line-height:1.7">Complete security report with all ${STATE.findings.length} findings — severity, category, file location, description, and code context.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="downloadReport()">Download JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyReport()">Copy to Clipboard</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><div class="card-title-line"></div>Preview</div></div>
+    <pre class="report-pre">${esc(window._reportStr)}</pre>
+  </div>`;
+}
+
+function downloadReport(){const b=new Blob([window._reportStr],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`crx-scan-${STATE.extName.replace(/\s+/g,'_')}-${Date.now()}.json`;a.click();}
+function copyReport(){navigator.clipboard.writeText(window._reportStr).then(()=>alert('Copied to clipboard'));}
+</script>
+</body>
+</html>
