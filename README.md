@@ -21,6 +21,10 @@ L.A.Y.E.R.S. includes a built-in scoring engine that:
 - Assigns weighted risk values across findings
 - Generates an overall extension risk score
 
+## Rough Arch Diagram for Layers
+
+<img width="952" height="738" alt="basic arch for layers" src="https://github.com/user-attachments/assets/7b1d1be7-a6ed-418b-a031-f04d8c408d14" />
+
 ## Who Is This For?
 
 - Security researchers
