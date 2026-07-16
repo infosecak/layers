@@ -2,7 +2,8 @@ L.A.Y.E.R.S. (Layered Analyst for Your Extension Risk Surface) is an open-source
 
 The tool performs multi-layered static analysis across key components of an extension and generates a risk score to help users make informed security decisions.
 
-<img width="500" height="500" alt="L a y e r s" src="https://github.com/user-attachments/assets/b78710fa-d047-45b3-9324-23023772f0c8" />
+<img width="1500" height="460" alt="layers-lockup-light" src="https://github.com/user-attachments/assets/eea00f50-22fe-4fa9-b43c-726181972149" />
+
 
 ## What L.A.Y.E.R.S. Does
 
