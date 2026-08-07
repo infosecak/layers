@@ -1,40 +1,16 @@
-L.A.Y.E.R.S. (Logical Analyst for Your Extension Risk Surface) is an open-source browser extension security scanning engine designed to identify potential vulnerabilities, misconfigurations, and security risks in browser extensions before they are installed or deployed.
+# React + Vite
 
-The tool performs multi-layered static analysis across key components of an extension and generates a risk score to help users make informed security decisions.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-<img width="1500" height="460" alt="layers-lockup-light" src="https://github.com/user-attachments/assets/eea00f50-22fe-4fa9-b43c-726181972149" />
+Currently, two official plugins are available:
 
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## What L.A.Y.E.R.S. Does
+## React Compiler
 
-L.A.Y.E.R.S. scans browser extensions on various parameters, including:
-- JavaScript Analysis – Detects insecure patterns, dangerous APIs, and suspicious behaviors
-- Secret Scanning – Identifies hardcoded API keys, tokens, and credentials
-- URL Extraction & Analysis – Flags suspicious, external, or risky endpoints
-- Permission Analysis – Evaluates requested permissions against risk levels
-- Manifest Analysis – Reviews manifest configuration for insecure settings
-- HTML Scanning – Detects inline scripts, injection risks, and unsafe constructs
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Risk Scoring System
+## Expanding the Oxlint configuration
 
-L.A.Y.E.R.S. includes a built-in scoring engine that:
-
-- Assigns weighted risk values across findings
-- Generates an overall extension risk score
-
-## Rough Arch Diagram for Layers
-
-<img width="952" height="738" alt="basic arch for layers" src="https://github.com/user-attachments/assets/7b1d1be7-a6ed-418b-a031-f04d8c408d14" />
-
-## Who Is This For?
-
-- Security researchers
-- AppSec teams
-- Browser extension developers
-- Enterprise security teams
-- Anyone who wants to evaluate extension risk before installation
-
-## ACKNOWLEDGEMENTS
-
-Shoutout to all the amazing researchers who have worked on browser extension security previously
-Please feel free to contribute to the tool.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
