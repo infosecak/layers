@@ -36,7 +36,7 @@ L.A.Y.E.R.S. includes a built-in scoring engine that:
 
 ## CONTRIBUTOS/CO-AUTHORS
 
-- Krishna Chaganti ()
+- Krishna Chaganti (https://www.linkedin.com/in/kchaganti)
 - Anurag Mishra ()
   
 ## ACKNOWLEDGEMENTS
