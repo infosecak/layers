@@ -1,4 +1,4 @@
-L.A.Y.E.R.S. (Layered Analyst for Your Extension Risk Surface) is an open-source browser extension security scanning engine designed to identify potential vulnerabilities, misconfigurations, and security risks in browser extensions before they are installed or deployed.
+L.A.Y.E.R.S. (Logical Analyst for Your Extension Risk Surface) is an open-source browser extension security scanning engine designed to identify potential vulnerabilities, misconfigurations, and security risks in browser extensions before they are installed or deployed.
 
 The tool performs multi-layered static analysis across key components of an extension and generates a risk score to help users make informed security decisions.
 
