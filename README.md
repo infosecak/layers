@@ -34,6 +34,11 @@ L.A.Y.E.R.S. includes a built-in scoring engine that:
 - Enterprise security teams
 - Anyone who wants to evaluate extension risk before installation
 
+## CONTRIBUTOS/CO-AUTHORS
+
+- Krishna Chaganti ()
+- Anurag Mishra ()
+  
 ## ACKNOWLEDGEMENTS
 
 Shoutout to all the amazing researchers who have worked on browser extension security previously
