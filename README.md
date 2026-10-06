@@ -24,7 +24,7 @@ L.A.Y.E.R.S. includes a built-in scoring engine that:
 
 ## Rough Arch Diagram for Layers
 
-<img width="952" height="738" alt="basic arch for layers" src="https://github.com/user-attachments/assets/7b1d1be7-a6ed-418b-a031-f04d8c408d14" />
+<img width="2400" height="1792" alt="arch diagram" src="https://github.com/user-attachments/assets/a303e1c0-3ebf-4b5f-8e07-7d6f05db1694" />
 
 ## Who Is This For?
 
